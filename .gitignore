@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# CDK
+cdk.out/
+.cdk.staging/
+.cdk/
+dist/
+
+# TypeScript compiled output
+*.js
+*.d.ts
+*.js.map
+!cdk.json
+!jest.config.js
+
+# Env / secrets
+.env
+.env.local
+*.local
+secrets.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+!ui/**/*.js
+cdk-outputs.json
+
+# Personal settings (email) and account-specific CDK lookups
+local.config.json
+cdk.context.json

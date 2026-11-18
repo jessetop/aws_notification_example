@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City IT Notices</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="public">
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <div>
+        <h1>City IT Service Notices</h1>
+        <p class="sub">Updates about city systems and online services</p>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section id="latest" class="card latest" aria-live="polite">
+      <p class="muted">Loading the latest notice…</p>
+    </section>
+    <section>
+      <h2>Recent notices</h2>
+      <ol id="notices" class="notices"></ol>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const sevClass = { HIGH: 'bad', MEDIUM: 'warn', LOW: 'info' };
+      const card = (n, big) => {
+        const wrap = document.createElement(big ? 'div' : 'li');
+        const head = document.createElement(big ? 'h2' : 'h3');
+        const badge = document.createElement('span');
+        badge.className = `badge ${sevClass[n.severity] || ''}`;
+        badge.textContent = (n.severity || '').toLowerCase();
+        head.append(badge, ' ', n.title || 'Notice');
+        const p = document.createElement('p');
+        p.textContent = n.summary;
+        const t = document.createElement('p');
+        t.className = 'muted small';
+        t.textContent = `Published ${new Date(n.publishedAt).toLocaleString()}`;
+        wrap.append(head, p, t);
+        return wrap;
+      };
+      async function load() {
+        try {
+          const [latest, history] = await Promise.all([
+            fetch('notices/latest.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
+            fetch('notices/history.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])),
+          ]);
+          const l = document.getElementById('latest');
+          if (latest) l.replaceChildren(card(latest, true));
+          else l.innerHTML = '<p class="muted">No notices have been published. All systems are operating normally.</p>';
+          document.getElementById('notices').replaceChildren(...history.slice(1).map((n) => card(n, false)));
+        } catch {
+          document.getElementById('latest').innerHTML = '<p class="muted">Notices are temporarily unavailable.</p>';
+        }
+      }
+      load();
+      setInterval(load, 30000);
+    })();
+  </script>
+</body>
+</html>

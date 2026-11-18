@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notification Console</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <div>
+        <h1>Notification Console</h1>
+        <p class="sub">City IT operator controls</p>
+      </div>
+    </div>
+    <a class="link" href="notices.html" target="_blank" rel="noopener">Public notices ↗</a>
+  </header>
+
+  <main>
+    <section id="auth" class="card auth" hidden>
+      <h2>Operator key</h2>
+      <p class="muted">Get it with:
+        <code>aws secretsmanager get-secret-value --secret-id notification-demo/operator-key --query SecretString --output text --profile roitraining</code>
+      </p>
+      <form id="auth-form" class="row">
+        <input id="key-input" type="password" autocomplete="off" placeholder="Paste operator key" required>
+        <button type="submit">Unlock</button>
+      </form>
+      <p id="auth-error" class="error" role="alert"></p>
+    </section>
+
+    <div id="app" hidden>
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <a class="tab" role="tab" href="#alerts" data-tab="alerts">Alerts</a>
+        <a class="tab" role="tab" href="#logs" data-tab="logs">Logs</a>
+        <a class="tab" role="tab" href="#rules" data-tab="rules">Rules</a>
+        <span class="spacer"></span>
+        <button id="lock" class="ghost">Forget key</button>
+      </nav>
+
+      <!-- ===== Alerts: channels, anti-spam, history ===== -->
+      <div id="panel-alerts" class="panel" role="tabpanel">
+        <section>
+          <h2>Channels</h2>
+          <div id="channels" class="grid"></div>
+        </section>
+
+        <section class="card settings">
+          <h2>Anti-spam</h2>
+          <form id="dedup-form" class="row">
+            <label for="dedup-window">Suppress repeats of the same alert for</label>
+            <input id="dedup-window" type="number" min="1" max="1440" step="1" required>
+            <span class="muted">minutes</span>
+            <button type="submit">Save</button>
+          </form>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <h2>History</h2>
+            <button id="refresh" class="ghost">Refresh</button>
+          </div>
+          <div class="card table-wrap">
+            <table>
+              <thead>
+                <tr><th>Time</th><th>Server</th><th>Rule</th><th>Status</th><th>Channels</th><th>Summary</th><th></th></tr>
+              </thead>
+              <tbody id="history"></tbody>
+            </table>
+            <p id="history-empty" class="muted empty" hidden>No notifications yet. Alerts appear when a rule's threshold is crossed.</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===== Logs: one place to search every server's logs ===== -->
+      <div id="panel-logs" class="panel" role="tabpanel" hidden>
+        <section>
+          <div class="section-head">
+            <h2>Fleet logs</h2>
+            <button id="hosts-refresh" class="ghost">Refresh servers</button>
+          </div>
+          <div class="card filters">
+            <fieldset>
+              <legend>Servers <span class="muted small">(none selected = all)</span></legend>
+              <div id="host-list" class="chips"><span class="muted small">Loading…</span></div>
+            </fieldset>
+            <fieldset>
+              <legend>Log types</legend>
+              <div id="type-list" class="chips"></div>
+            </fieldset>
+            <form id="logs-form" class="filter-row">
+              <label class="grow">Contains <span class="muted small">(any of, comma-separated)</span>
+                <input id="logs-terms" type="text" placeholder="Fatal error, wp-login, [4625]">
+              </label>
+              <label>Time range
+                <select id="logs-range">
+                  <option value="15">Last 15 minutes</option>
+                  <option value="60" selected>Last hour</option>
+                  <option value="360">Last 6 hours</option>
+                  <option value="1440">Last 24 hours</option>
+                  <option value="10080">Last 7 days</option>
+                  <option value="custom">Custom…</option>
+                </select>
+              </label>
+              <label class="custom-time" hidden>From <input id="logs-from" type="datetime-local"></label>
+              <label class="custom-time" hidden>To <input id="logs-to" type="datetime-local"></label>
+              <label class="check inline"><input id="logs-problems" type="checkbox"> Problems only</label>
+              <button type="submit">Search</button>
+            </form>
+            <details id="query-details">
+              <summary>Logs Insights query</summary>
+              <textarea id="logs-query" rows="7" spellcheck="false" aria-label="Logs Insights query"></textarea>
+              <div class="row">
+                <button id="run-raw" type="button" class="ghost">Run this query</button>
+                <a id="console-link" href="#" target="_blank" rel="noopener" hidden>Open in CloudWatch Logs Insights ↗</a>
+              </div>
+            </details>
+          </div>
+        </section>
+        <p id="logs-status" class="muted small" role="status"></p>
+        <div class="card table-wrap">
+          <table class="logs">
+            <thead><tr><th>Time</th><th>Server</th><th>Log</th><th>Message</th></tr></thead>
+            <tbody id="logs-rows"></tbody>
+          </table>
+          <p id="logs-empty" class="muted empty">Search to see log lines from every server.</p>
+        </div>
+      </div>
+
+      <!-- ===== Rules: what raises an alert ===== -->
+      <div id="panel-rules" class="panel" role="tabpanel" hidden>
+        <section>
+          <div class="section-head">
+            <h2>Alert rules</h2>
+            <button id="rule-new">New rule</button>
+          </div>
+          <p class="muted">A rule raises an alert when <strong>one server</strong> logs at least <em>threshold</em> matching lines inside the window.
+            Each alert goes through the normal pipeline (dedup, AI summary, guardrail, channels). Changes take effect within 30 seconds.</p>
+          <div class="card table-wrap">
+            <table>
+              <thead><tr><th>On</th><th>Rule</th><th>Logs</th><th>Matches when</th><th>Alert at</th><th>Severity</th><th></th></tr></thead>
+              <tbody id="rules-rows"></tbody>
+            </table>
+            <p id="rules-empty" class="muted empty" hidden>No rules. Nothing will alert until you add one.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <dialog id="rule-dialog" aria-labelledby="rule-dialog-title">
+    <form id="rule-form" method="dialog" class="rule-form">
+      <h2 id="rule-dialog-title">Rule</h2>
+      <label>Name <input id="rule-name" type="text" required minlength="2" maxlength="80"></label>
+      <label>ID <input id="rule-id" type="text" required pattern="[a-z0-9][a-z0-9\-]{1,47}" placeholder="lowercase-with-hyphens"></label>
+      <fieldset>
+        <legend>Log types</legend>
+        <div id="rule-types" class="chips"></div>
+      </fieldset>
+      <p class="muted small">Conditions (all that are set must match):</p>
+      <label>Minimum level
+        <select id="rule-level">
+          <option value="">Any level</option>
+          <option value="WARN">WARN or worse</option>
+          <option value="ERROR">ERROR or worse</option>
+          <option value="CRITICAL">CRITICAL only</option>
+        </select>
+      </label>
+      <label>Contains any of <span class="muted small">(comma-separated, case-insensitive)</span>
+        <input id="rule-terms" type="text" placeholder="PHP Fatal error, wp-login.php">
+      </label>
+      <label>Windows event IDs <span class="muted small">(comma-separated)</span>
+        <input id="rule-events" type="text" placeholder="4625, 4740">
+      </label>
+      <div class="filter-row">
+        <label>Alert at <input id="rule-threshold" type="number" min="1" max="10000" required> matches</label>
+        <label>within <input id="rule-window" type="number" min="1" max="60" required> minutes</label>
+        <label>Severity
+          <select id="rule-severity"><option>LOW</option><option selected>MEDIUM</option><option>HIGH</option></select>
+        </label>
+      </div>
+      <label class="check"><input id="rule-enabled" type="checkbox" checked> Enabled</label>
+      <p id="rule-error" class="error" role="alert"></p>
+      <div class="row end">
+        <button type="button" id="rule-preview" class="ghost">Preview matches (last hour)</button>
+        <button type="button" id="rule-cancel" class="ghost">Cancel</button>
+        <button type="submit" id="rule-save">Save rule</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
